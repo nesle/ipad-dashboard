@@ -139,10 +139,15 @@ def collect():
             running = str(r.get('status') or '').lower() == 'running'
             cpu_raw = number(r.get('cpu'))
             cpu = round(cpu_raw * 100, 1) if cpu_raw is not None and 0 <= cpu_raw <= 1 else None
+            # Proxmox QEMU mem/maxmem may reflect host-side QEMU memory, not
+            # guest memory pressure. Guest-agent availability does not establish
+            # that virtio-balloon memory statistics are usable. Keep the raw
+            # percentage for diagnostics, but do not use it for QEMU alerts.
             mem = pct(r.get('mem'), r.get('maxmem'))
             # Proxmox QEMU disk/maxdisk does NOT reliably represent guest filesystem usage.
             disk = pct(r.get('disk'), r.get('maxdisk')) if kind == 'lxc' else None
-            state = status(cpu, mem, disk, running) if is_fresh else 'unknown'
+            alert_mem = mem if kind == 'lxc' else None
+            state = status(cpu, alert_mem, disk, running) if is_fresh else 'unknown'
             out.append({'id': vmid, 'name': r.get('name') or r.get('host'),
                         'node': r.get('nodename'), 'status': state, 'cpu': cpu,
                         'mem': mem, 'disk': disk, 'fresh': is_fresh})
