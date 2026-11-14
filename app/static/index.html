@@ -1,51 +1,421 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="Status">
-<title>Home Status</title>
-<style>
-*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#101827;color:#e7eff9;font-family:-apple-system,Helvetica,Arial,sans-serif}body{padding:17px 20px}.top{overflow:hidden;margin-bottom:13px}.title{float:left;font-size:19px;font-weight:600;letter-spacing:1px}.clock{float:right;color:#a9bed6;font-size:18px}.panel{background:#19273a;border:1px solid #304258;border-radius:11px;padding:14px 15px;max-width:1000px}.head{overflow:hidden;margin-bottom:12px}.head strong{float:left;font-size:14px;letter-spacing:1px}.update{float:right;font-size:11px;color:#91a7c1}.line{overflow:hidden;margin:9px 0}.label{float:left;width:56px;color:#a6bad1;font-size:12px;padding-top:5px}.contents{margin-left:56px;min-height:23px}.nodes{overflow:hidden}.node{float:left;width:33.333%;padding-right:6px}.nodebox{background:#22344a;border-radius:7px;padding:7px 8px;white-space:nowrap;overflow:hidden}.node-name{font-size:12px;font-weight:bold}.metrics{display:block;font-size:11px;color:#a5bad0;margin-top:5px;white-space:nowrap}.dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin:0 6px 0 0;vertical-align:middle;border:1px solid rgba(255,255,255,.2)}.healthy{background:#56d59a}.warning{background:#edbe5d}.critical{background:#ed7477}.stopped{background:#4b5665;border-color:#9aa6b6}.unknown{background:#9a81d4}.dots{line-height:23px}.dots .dot{margin-right:5px}.ceph-layout{display:table;width:100%;table-layout:fixed}.ceph-bar-cell{display:table-cell;vertical-align:middle}.ceph-percent-cell{display:table-cell;width:54px;text-align:right;vertical-align:middle}.bar{height:11px;background:#34465c;border-radius:9px;overflow:hidden}.fill{height:100%;background:#7fb8f4;width:0}.percent{font-size:12px;line-height:16px;white-space:nowrap}.separator{border-top:1px solid #304258;margin:12px 0}.foot{margin-top:11px;color:#8195ae;font-size:11px}.err{color:#edbe5d}.placeholder{color:#8d9fb5;font-size:12px}.legend{font-size:11px;color:#91a7c1;margin-top:8px}.legend .dot{width:8px;height:8px;margin-left:10px;margin-right:3px}@media(max-width:650px){body{padding:10px}.panel{padding:11px}.node{width:100%;margin-bottom:4px}.nodebox{padding:5px 8px}.metrics{display:block;margin-left:17px;margin-top:3px}.label{width:48px}.contents{margin-left:48px}}
-</style></head><body>
-<div class="top"><div class="title">HOME STATUS</div><div class="clock" id="clock">--:--</div></div>
-<div class="panel"><div class="head"><strong>PROXMOX</strong><span class="update" id="updated">Connecting…</span></div>
-<div class="line"><div class="label">Nodes</div><div class="contents nodes" id="nodes"><span class="placeholder">Waiting for metrics…</span></div></div>
-<div class="separator"></div>
-<div class="line"><div class="label">Ceph</div><div class="contents"><div class="ceph-layout"><div class="ceph-bar-cell"><div class="bar"><div class="fill" id="cephfill"></div></div></div><div class="ceph-percent-cell"><span class="percent" id="cephval">—</span></div></div></div></div>
-<div class="line"><div class="label">NAS</div><div class="contents"><div class="ceph-layout"><div class="ceph-bar-cell"><div class="bar"><div class="fill" id="nasfill"></div></div></div><div class="ceph-percent-cell"><span class="percent" id="nasval">—</span></div></div></div></div>
-<div class="separator"></div>
-<div class="line"><div class="label">VMs</div><div class="contents dots" id="vms">—</div></div>
-<div class="line"><div class="label">LXC</div><div class="contents dots" id="lxc">—</div></div>
-<div class="legend"><span class="dot healthy"></span>OK <span class="dot warning"></span>Warning <span class="dot critical"></span>Critical <span class="dot stopped"></span>Stopped <span class="dot unknown"></span>Unknown</div>
-<div class="foot" id="message">Read-only · Live data from InfluxDB</div></div>
-<script>
-(function(){
-function el(id){return document.getElementById(id)}
-function txt(id,s){el(id).innerHTML=s}
-function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-function fmt(n){return typeof n==='number'?Math.round(n)+'%':'—'}
-function clock(){var d=new Date();txt('clock',('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2))}
-function dot(item){var cls=item.status||'unknown';return '<span class="dot '+cls+'" title="'+esc((item.name||item.id||'')+' · '+cls)+'"></span>'}
-function render(data){
- var now=Date.now()/1000, updated=data.updated?Date.parse(data.updated)/1000:0;
- var stale=!updated||now-updated>120;
- txt('updated',data.error?'Collector error':stale?'Data stale':'Updated '+new Date(data.updated).toLocaleTimeString());
- var nodes=data.nodes||[],html='',i,n;
- for(i=0;i<nodes.length;i++){n=nodes[i];html+='<div class="node"><div class="nodebox"><span class="dot '+(stale?'unknown':(!n.online?'unknown':n.status))+'"></span><span class="node-name">'+esc(n.name)+'</span><span class="metrics">CPU '+fmt(n.cpu)+' · RAM '+fmt(n.mem)+'</span></div></div>'}
- txt('nodes',html||'<span class="placeholder">No node data</span>');
- var guests=data.guests||{};
- function dots(items){if(!items||!items.length)return '<span class="placeholder">No guests found</span>';var s='';for(var j=0;j<items.length;j++)s+=dot(stale?{status:'unknown',id:items[j].id}:items[j]);return s}
- txt('vms',dots(guests.qemu));txt('lxc',dots(guests.lxc));
- var p=data.ceph&&data.ceph.percent;
- txt('cephval',!stale&&typeof p==='number'?p.toFixed(1)+'%':'—');
- el('cephfill').style.width=!stale&&typeof p==='number'?Math.max(0,Math.min(100,p))+'%':'0%';
- var p=data.nas&&data.nas.percent;
- txt('nasval',!stale&&typeof p==='number'?p.toFixed(1)+'%':'—');
- el('nasfill').style.width=!stale&&typeof p==='number'?Math.max(0,Math.min(100,p))+'%':'0%';
- txt('message',data.error?'<span class="err">Collector: '+esc(data.error)+'</span>':stale?'<span class="err">Metrics unavailable or stale</span>':'Read-only · Live data from InfluxDB');
-}
-function load(){var x=new XMLHttpRequest();x.open('GET','/api/status?t='+new Date().getTime(),true);x.onreadystatechange=function(){if(x.readyState===4){if(x.status===200){try{render(JSON.parse(x.responseText))}catch(e){txt('message','Invalid API response')}}else{txt('updated','Connection lost');txt('message','Cannot reach dashboard backend')}}};x.send(null)}
-clock();setInterval(clock,1000);load();setInterval(load,30000);
-}());
-</script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Status">
+  <title>Home Status</title>
+  <style>
+    * {
+      box-sizing:border-box}
+    
+    html,body {
+      margin:0;
+      min-height:100%;
+      background:#101827;
+      color:#e7eff9;
+      font-family:-apple-system,Helvetica,Arial,sans-serif}
+    
+    body {
+      padding:17px 20px}
+    
+    .top {
+      overflow:hidden;
+      margin-bottom:13px}
+    
+    .title {
+      float:left;
+      font-size:19px;
+      font-weight:600;
+      letter-spacing:1px}
+    
+    .clock {
+      float:right;
+      color:#a9bed6;
+      font-size:18px}
+    
+    .panel {
+      background:#19273a;
+      border:1px solid #304258;
+      border-radius:11px;
+      padding:14px 15px;
+      max-width:1000px}
+    
+    .head {
+      overflow:hidden;
+      margin-bottom:12px}
+    
+    .head strong {
+      float:left;
+      font-size:14px;
+      letter-spacing:1px}
+    
+    .update {
+      float:right;
+      font-size:11px;
+      color:#91a7c1}
+    
+    .line {
+      overflow:hidden;
+      margin:9px 0}
+    
+    .label {
+      float:left;
+      width:56px;
+      color:#a6bad1;
+      font-size:12px;
+      padding-top:5px}
+    
+    .contents {
+      margin-left:56px;
+      min-height:23px}
+    
+    .nodes {
+      overflow:hidden}
+    
+    .node {
+      float:left;
+      width:33.333%;
+      padding-right:6px}
+    
+    .nodebox {
+      background:#22344a;
+      border-radius:7px;
+      padding:7px 8px;
+      white-space:nowrap;
+      overflow:hidden}
+    
+    .node-name {
+      font-size:12px;
+      font-weight:bold}
+    
+    .metrics {
+      display:block;
+      font-size:11px;
+      color:#a5bad0;
+      margin-top:5px;
+      white-space:nowrap}
+    
+    .dot {
+      display:inline-block;
+      width:11px;
+      height:11px;
+      border-radius:50%;
+      margin:0 6px 0 0;
+      vertical-align:middle;
+      border:1px solid rgba(255,255,255,.2)}
+    
+    .healthy {
+      background:#56d59a}
+    
+    .warning {
+      background:#edbe5d}
+    
+    .critical {
+      background:#ed7477}
+    
+    .stopped {
+      background:#4b5665;
+      border-color:#9aa6b6}
+    
+    .unknown {
+      background:#9a81d4}
+    
+    .dots {
+      line-height:23px}
+    
+    .dots .dot {
+      margin-right:5px}
+    
+    .ceph-layout {
+      display:table;
+      width:100%;
+      table-layout:fixed}
+    
+    .ceph-bar-cell {
+      display:table-cell;
+      vertical-align:middle}
+    
+    .ceph-percent-cell {
+      display:table-cell;
+      width:54px;
+      text-align:right;
+      vertical-align:middle}
+    
+    .bar {
+      height:11px;
+      background:#34465c;
+      border-radius:9px;
+      overflow:hidden}
+    
+    .fill {
+      height:100%;
+      background:#7fb8f4;
+      width:0}
+    
+    .percent {
+      font-size:12px;
+      line-height:16px;
+      white-space:nowrap}
+    
+    .separator {
+      border-top:1px solid #304258;
+      margin:12px 0}
+    
+    .foot {
+      margin-top:11px;
+      color:#8195ae;
+      font-size:11px}
+    
+    .err {
+      color:#edbe5d}
+    
+    .placeholder {
+      color:#8d9fb5;
+      font-size:12px}
+    
+    .legend {
+      font-size:11px;
+      color:#91a7c1;
+      margin-top:8px}
+    
+    .legend .dot {
+      width:8px;
+      height:8px;
+      margin-left:10px;
+      margin-right:3px}
+    
+    @media (max-width:650px) {
+      body {
+      padding:10px}
+    
+    .panel {
+      padding:11px}
+    
+    .node {
+      width:100%;
+      margin-bottom:4px}
+    
+    .nodebox {
+      padding:5px 8px}
+    
+    .metrics {
+      display:block;
+      margin-left:17px;
+      margin-top:3px}
+    
+    .label {
+      width:48px}
+    
+    .contents {
+      margin-left:48px}
+    
+    }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="title">HOME STATUS</div>
+    <div class="clock" id="clock">--:--</div>
+  </div>
+
+  <div class="panel">
+    <div class="head">
+      <strong>PROXMOX</strong>
+      <span class="update" id="updated">Connecting…</span>
+    </div>
+
+    <div class="line">
+      <div class="label">Nodes</div>
+      <div class="contents nodes" id="nodes">
+        <span class="placeholder">Waiting for metrics…</span>
+      </div>
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="line">
+      <div class="label">Ceph</div>
+      <div class="contents">
+        <div class="ceph-layout">
+          <div class="ceph-bar-cell">
+            <div class="bar"><div class="fill" id="cephfill"></div></div>
+          </div>
+          <div class="ceph-percent-cell">
+            <span class="percent" id="cephval">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="line">
+      <div class="label">NAS</div>
+      <div class="contents">
+        <div class="ceph-layout">
+          <div class="ceph-bar-cell">
+            <div class="bar"><div class="fill" id="nasfill"></div></div>
+          </div>
+          <div class="ceph-percent-cell">
+            <span class="percent" id="nasval">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="separator"></div>
+
+    <div class="line">
+      <div class="label">VMs</div>
+      <div class="contents dots" id="vms">—</div>
+    </div>
+    <div class="line">
+      <div class="label">LXC</div>
+      <div class="contents dots" id="lxc">—</div>
+    </div>
+
+    <div class="legend">
+      <span class="dot healthy"></span>OK
+      <span class="dot warning"></span>Warning
+      <span class="dot critical"></span>Critical
+      <span class="dot stopped"></span>Stopped
+      <span class="dot unknown"></span>Unknown
+    </div>
+    <div class="foot" id="message">Read-only · Live data from InfluxDB</div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // ES5 syntax is intentional: the dashboard runs on iOS 9 Safari.
+      var REFRESH_MS = 30000;
+      var STALE_SECONDS = 120;
+
+      function element(id) {
+        return document.getElementById(id);
+      }
+
+      function setHtml(id, html) {
+        element(id).innerHTML = html;
+      }
+
+      function escapeHtml(value) {
+        return String(value == null ? '' : value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function formatPercent(value) {
+        return typeof value === 'number' ? Math.round(value) + '%' : '—';
+      }
+
+      function updateClock() {
+        var now = new Date();
+        var hours = ('0' + now.getHours()).slice(-2);
+        var minutes = ('0' + now.getMinutes()).slice(-2);
+        setHtml('clock', hours + ':' + minutes);
+      }
+
+      function renderDot(guest) {
+        var state = guest.status || 'unknown';
+        var title = (guest.name || guest.id || '') + ' · ' + state;
+        return '<span class="dot ' + state + '" title="' + escapeHtml(title) + '"></span>';
+      }
+
+      function renderNodes(nodes, stale) {
+        var html = '';
+        var i;
+        var node;
+        var state;
+
+        for (i = 0; i < nodes.length; i++) {
+          node = nodes[i];
+          state = stale || !node.online ? 'unknown' : node.status;
+
+          html += '<div class="node"><div class="nodebox">' +
+            '<span class="dot ' + state + '"></span>' +
+            '<span class="node-name">' + escapeHtml(node.name) + '</span>' +
+            '<span class="metrics">CPU ' + formatPercent(node.cpu) +
+            ' · RAM ' + formatPercent(node.mem) + '</span>' +
+            '</div></div>';
+        }
+
+        setHtml('nodes', html || '<span class="placeholder">No node data</span>');
+      }
+
+      function renderGuests(id, guests, stale) {
+        if (!guests || !guests.length) {
+          setHtml(id, '<span class="placeholder">No guests found</span>');
+          return;
+        }
+
+        var html = '';
+        var i;
+        for (i = 0; i < guests.length; i++) {
+          html += renderDot(stale ? { status: 'unknown', id: guests[i].id } : guests[i]);
+        }
+        setHtml(id, html);
+      }
+
+      function renderStorage(prefix, storage, stale) {
+        var percent = storage && storage.percent;
+        var available = !stale && typeof percent === 'number';
+
+        setHtml(prefix + 'val', available ? percent.toFixed(1) + '%' : '—');
+        element(prefix + 'fill').style.width = available ?
+          Math.max(0, Math.min(100, percent)) + '%' : '0%';
+      }
+
+      function render(data) {
+        var updated = data.updated ? Date.parse(data.updated) / 1000 : 0;
+        var stale = !updated || Date.now() / 1000 - updated > STALE_SECONDS;
+        var guests = data.guests || {};
+
+        setHtml('updated', data.error ? 'Collector error' :
+          stale ? 'Data stale' : 'Updated ' + new Date(data.updated).toLocaleTimeString());
+
+        renderNodes(data.nodes || [], stale);
+        renderGuests('vms', guests.qemu, stale);
+        renderGuests('lxc', guests.lxc, stale);
+        renderStorage('ceph', data.ceph, stale);
+        renderStorage('nas', data.nas, stale);
+
+        setHtml('message', data.error ?
+          '<span class="err">Collector: ' + escapeHtml(data.error) + '</span>' :
+          stale ? '<span class="err">Metrics unavailable or stale</span>' :
+          'Read-only · Live data from InfluxDB');
+      }
+
+      function loadStatus() {
+        var request = new XMLHttpRequest();
+        request.open('GET', '/api/status?t=' + new Date().getTime(), true);
+        request.onreadystatechange = function () {
+          if (request.readyState !== 4) {
+            return;
+          }
+          if (request.status !== 200) {
+            setHtml('updated', 'Connection lost');
+            setHtml('message', 'Cannot reach dashboard backend');
+            return;
+          }
+          try {
+            render(JSON.parse(request.responseText));
+          } catch (error) {
+            setHtml('message', 'Invalid API response');
+          }
+        };
+        request.send(null);
+      }
+
+      updateClock();
+      setInterval(updateClock, 1000);
+      loadStatus();
+      setInterval(loadStatus, REFRESH_MS);
+    }());
+  </script>
+</body>
+</html>
