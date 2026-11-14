@@ -1,0 +1,12 @@
+services:
+  dashboard:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8838:8080"
+    env_file: .env
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
