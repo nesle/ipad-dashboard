@@ -21,21 +21,6 @@
     body {
       padding:17px 20px}
     
-    .top {
-      overflow:hidden;
-      margin-bottom:13px}
-    
-    .title {
-      float:left;
-      font-size:19px;
-      font-weight:600;
-      letter-spacing:1px}
-    
-    .clock {
-      float:right;
-      color:#a9bed6;
-      font-size:18px}
-    
     .panel {
       background:#19273a;
       border:1px solid #304258;
@@ -216,11 +201,6 @@
   </style>
 </head>
 <body>
-  <div class="top">
-    <div class="title">HOME STATUS</div>
-    <div class="clock" id="clock">--:--</div>
-  </div>
-
   <div class="panel">
     <div class="head">
       <strong>PROXMOX</strong>
@@ -311,13 +291,6 @@
 
       function formatPercent(value) {
         return typeof value === 'number' ? Math.round(value) + '%' : '—';
-      }
-
-      function updateClock() {
-        var now = new Date();
-        var hours = ('0' + now.getHours()).slice(-2);
-        var minutes = ('0' + now.getMinutes()).slice(-2);
-        setHtml('clock', hours + ':' + minutes);
       }
 
       function renderDot(guest) {
@@ -411,8 +384,6 @@
         request.send(null);
       }
 
-      updateClock();
-      setInterval(updateClock, 1000);
       loadStatus();
       setInterval(loadStatus, REFRESH_MS);
     }());
