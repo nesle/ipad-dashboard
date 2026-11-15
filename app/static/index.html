@@ -43,32 +43,6 @@
       );
     }
 
-    .top {
-      overflow: hidden;
-      max-width: 1000px;
-      margin-bottom: 11px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid #6d451c;
-    }
-
-    .title {
-      float: left;
-      font-size: 18px;
-      font-weight: bold;
-      letter-spacing: 2px;
-      color: #ffd17b;
-    }
-
-    .title:before { content: "> "; color: #ae6c24; }
-
-    .clock {
-      float: right;
-      color: #ffca69;
-      font-size: 18px;
-      font-weight: bold;
-      letter-spacing: 1px;
-    }
-
     .panel {
       max-width: 1000px;
       padding: 11px 13px;
@@ -160,25 +134,40 @@
       border: 1px solid currentColor;
       border-radius: 1px;
       vertical-align: middle;
+      position: relative;
     }
 
-    /* Preserve five distinct states within the warm monochrome palette. */
+    /* Shape carries the alert state, even on a low-contrast display. */
+    .warning:after,
+    .critical:after {
+      position: absolute;
+      top: -3px;
+      left: 0;
+      width: 100%;
+      color: #0d0b07;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      font-weight: bold;
+      line-height: 13px;
+      text-align: center;
+      text-shadow: none;
+    }
+
+    .warning:after { content: "/"; }
+    .critical:after { content: "×"; }
+
+    /* The same amber phosphor for active dots; symbols distinguish alerts. */
     .healthy {
       color: #e6a642;
       background: #e6a642;
       box-shadow: 0 0 6px rgba(245, 173, 56, .55);
     }
 
-    .warning {
-      color: #ffe3a2;
-      background: #ffe3a2;
-      box-shadow: 0 0 8px rgba(255, 227, 162, .7);
-    }
-
+    .warning,
     .critical {
-      color: #ff643b;
-      background: #ff643b;
-      box-shadow: 0 0 8px rgba(255, 100, 59, .7);
+      color: #e6a642;
+      background: #e6a642;
+      box-shadow: 0 0 6px rgba(245, 173, 56, .55);
     }
 
     .stopped {
@@ -226,13 +215,7 @@
     .fill {
       width: 0;
       height: 100%;
-      background: repeating-linear-gradient(
-        to right,
-        #c7852b 0,
-        #c7852b 6px,
-        #7d501e 6px,
-        #7d501e 8px
-      );
+      background: #c7852b;
     }
 
     .percent {
@@ -281,11 +264,6 @@
   </style>
 </head>
 <body>
-  <div class="top">
-    <div class="title">HOME STATUS</div>
-    <div class="clock" id="clock">--:--</div>
-  </div>
-
   <div class="panel">
     <div class="head">
       <strong>PROXMOX</strong>
@@ -376,13 +354,6 @@
 
       function formatPercent(value) {
         return typeof value === 'number' ? Math.round(value) + '%' : '—';
-      }
-
-      function updateClock() {
-        var now = new Date();
-        var hours = ('0' + now.getHours()).slice(-2);
-        var minutes = ('0' + now.getMinutes()).slice(-2);
-        setHtml('clock', hours + ':' + minutes);
       }
 
       function renderDot(guest) {
@@ -476,8 +447,6 @@
         request.send(null);
       }
 
-      updateClock();
-      setInterval(updateClock, 1000);
       loadStatus();
       setInterval(loadStatus, REFRESH_MS);
     }());
