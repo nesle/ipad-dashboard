@@ -39,3 +39,9 @@ SELECT * FROM "system" WHERE "object"='storages' AND time > now() - 5m LIMIT 5
 ```
 
 If CPU/RAM show `—`, inspect `/api/status` and these queries before adjusting the mapping. Storage can be absent if its name does not contain `ceph`; set `CEPH_STORAGE_PATTERN` to a unique substring of the actual storage name.
+
+## Node metric diagnostics
+
+Each node in `/api/status` includes a `diagnostics` object for `uptime`, `cpu`, and `mem`. Each entry contains `reason` and `age_seconds` (the age of the latest matching sample at collection time; negative means a future timestamp). Possible reasons: `ok`, `no_matching_record`, `future_timestamp`, `stale`, `missing_or_invalid_field`, `invalid_total`, and `out_of_range`. These fields do not change alert thresholds or guest status. The collector now snapshots its clock after completing the InfluxDB queries to avoid treating samples arriving during collection as future-dated.
+
+If CPU or memory is null, check the corresponding reason and sample age. The `updated` field reports collection completion, not source sample freshness. Avoid posting raw API output publicly: node and guest names may be sensitive.
