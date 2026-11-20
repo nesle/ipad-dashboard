@@ -79,6 +79,26 @@ def fresh(row, now):
     return 0 <= now - row['_ts'] <= STALE
 
 
+def metric_diagnostic(row, now, fields):
+    """Explain missing metrics without adding infrastructure identifiers."""
+    if row is None:
+        return {'reason': 'no_matching_record', 'age_seconds': None}
+    age = round(now - row['_ts'], 1)
+    if age < 0:
+        reason = 'future_timestamp'
+    elif age > STALE:
+        reason = 'stale'
+    elif any(number(row.get(field)) is None for field in fields):
+        reason = 'missing_or_invalid_field'
+    elif len(fields) == 2 and number(row[fields[1]]) <= 0:
+        reason = 'invalid_total'
+    elif fields == ('cpu',) and not 0 <= number(row[fields[0]]) <= 1:
+        reason = 'out_of_range'
+    else:
+        reason = 'ok'
+    return {'reason': reason, 'age_seconds': age}
+
+
 def newest_by(rows, key):
     result = {}
     for row in rows:
@@ -107,10 +127,12 @@ def get_storage(system, now, pattern):
 
 
 def collect():
-    now = time.time()
     system = query('system')
     cpus = query('cpustat')
     memory = query('memory')
+    # Take the freshness snapshot after queries; a timestamp from before the queries
+    # can incorrectly mark a newly arrived sample as being in the future.
+    now = time.time()
     # 'nodes' is the Proxmox object tag, not 'node'.
     node_uptime = newest_by([r for r in system if r.get('object') == 'nodes'], lambda r: r.get('host'))
     # Node-specific cpustat and memory; keep object filtering to avoid misattribution.
@@ -127,7 +149,12 @@ def collect():
             cpu = None
         nodes.append({'name': host, 'online': online, 'cpu': cpu, 'mem': mem,
                       'uptime': u.get('uptime') if online else None,
-                      'status': status(cpu, mem, None) if online else 'unknown'})
+                      'status': status(cpu, mem, None) if online else 'unknown',
+                      'diagnostics': {
+                          'uptime': metric_diagnostic(u, now, ('uptime',)),
+                          'cpu': metric_diagnostic(c, now, ('cpu',)),
+                          'mem': metric_diagnostic(m, now, ('memused', 'memtotal')),
+                      }})
     guests = {}
     for kind in ('qemu', 'lxc'):
         candidates = [r for r in system if r.get('object') == kind]
